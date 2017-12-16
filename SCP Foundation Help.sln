@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2017
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SCP Foundation Help.Plugins", "SCP Foundation Help.Plugins.csproj", "{6CC25EB8-9255-41A5-6751-1F46A40DB92C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SCP Foundation Help", "SCP Foundation Help.csproj", "{8D3E397E-EDCA-D232-E2DF-CAF02F6755FF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SCP Foundation Help.Editor.Plugins", "SCP Foundation Help.Editor.Plugins.csproj", "{DF4A854D-8CB4-1212-3E62-98B3BBFCAB4B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6CC25EB8-9255-41A5-6751-1F46A40DB92C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6CC25EB8-9255-41A5-6751-1F46A40DB92C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6CC25EB8-9255-41A5-6751-1F46A40DB92C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6CC25EB8-9255-41A5-6751-1F46A40DB92C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D3E397E-EDCA-D232-E2DF-CAF02F6755FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D3E397E-EDCA-D232-E2DF-CAF02F6755FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D3E397E-EDCA-D232-E2DF-CAF02F6755FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D3E397E-EDCA-D232-E2DF-CAF02F6755FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF4A854D-8CB4-1212-3E62-98B3BBFCAB4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF4A854D-8CB4-1212-3E62-98B3BBFCAB4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF4A854D-8CB4-1212-3E62-98B3BBFCAB4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF4A854D-8CB4-1212-3E62-98B3BBFCAB4B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
