@@ -3,17 +3,21 @@
 	Properties
 	{
 		[HideInInspector]_MainTex ("Texture", 2D) = "white" {}
+		_EyeYScale("Default Eye Y scale", Range(0, 0.4)) = 0.1
+		_EyeXScale("Eye X Scale", Range(0, 3.0)) = 0.5
 	    _EyeLidTex("Eye Lid Texture", 2D) = "red" {}
+		_EyeLidThickness("Eye Lid Thickness", Range(0, 0.5)) = 0.01
 		_ScleraTex("Sclera Texture", 2D) = "white" {}
 		_IrisTex("Iris Texture", 2D) = "black" {}
-        _EyeLidThickness("Eye Lid Thickness", Range(0, 0.5)) = 0.01
 		_EyeIrisSize("Size of Iris", Range(0, 0.5)) = 0.01
-		_EyeYScale("Eye Y scale", Range(0, 1.0)) = 0.1
-		_EyeXScale("Eye X Scale", Range(0, 1.0)) = 0.5
-		_EyeBlendAmount("Eye lid Blend", Range(0, 2.0)) = 1.2
-		_BumpAmt("Normal Distortion Amount", range(0,128)) = 10
-		_DistortionDiffuseTex("Texture", 2D) = "white" {}
+		_BumpAmt("Normal Distortion Scalar", range(0,128)) = 10
 		_BumpMap("Normalmap", 2D) = "bump" {}
+		_DistortRadius("DistortRadius", Range(0, 1.0)) = 0.1
+		_DistortBlendRadius("Distort blend radius", Range(0, 0.3)) = 0.1
+		[HideInInspector]_Fade("Fade", Range(0, 1.0)) = 0
+		[HideInInspector]_LookDirX("Iris X Look Coord", Range(0, 1)) = 0.5
+		[HideInInspector]_LookDirY("Iris Y Look Coord", Range(0, 1)) = 0.5
+		_LookMaxRadius("Max Look radius of Iris", Range(0, 1)) = 0.1
 	}
 	SubShader
 	{
@@ -22,7 +26,7 @@
 		Blend SrcAlpha OneMinusSrcAlpha
 		CUll Off
 		ZWrite Off
-		ZTest Off
+		ZTest On
 		LOD 200
 
 		GrabPass {
@@ -45,13 +49,18 @@
 			uniform sampler2D _EyeLidTex;
 			uniform sampler2D _ScleraTex;
 			uniform sampler2D _IrisTex;
-			uniform sampler2D _DistortionDiffuseTex;
 			uniform float4 _MainTex_ST;
 			uniform float _EyeLidThickness;
 			uniform float _EyeIrisSize;
 			uniform float _EyeXScale;
 			uniform float _EyeYScale;
 			uniform float _EyeBlendAmount;
+			uniform float _DistortRadius;
+			uniform float _DistortBlendRadius;
+			uniform float _Fade;
+			uniform float _LookDirX;
+			uniform float _LookDirY;
+			uniform float _LookMaxRadius;
 			float _BumpAmt;
 			float4 _BumpMap_ST;
 			sampler2D _GrabTexture;
@@ -101,69 +110,86 @@
 				#else
 				o.uvgrab.xy = offset * o.uvgrab.z + o.uvgrab.xy;
 				#endif
+
 				half4 col = tex2Dproj(_GrabTexture, UNITY_PROJ_COORD(o.uvgrab));
-				half4 distortColor = tex2D(_DistortionDiffuseTex, o.uv);
-				distortColor.a = 0;
 
-				fixed4 eyeLidColor = tex2D(_EyeLidTex, o.uv);
-				eyeLidColor.a = 0;
+				fixed2 centerCoord = fixed2(0.5, 0.5);
 
-				fixed4 scleraColor = tex2D(_ScleraTex, o.uv);
-				scleraColor.a = 0.5;
+				fixed isBlendPixel = 0;
 
-			    fixed2 centerCoord = (0.5, 0.5);
+				float sinWaveValue = sinCurve(o.uv.x, centerCoord.x, centerCoord.y, (_EyeXScale), _EyeYScale);
 
-				fixed invertAlpha = 0;
+				float sinWaveValueNegative = sinCurve(o.uv.x, centerCoord.x, centerCoord.y, (_EyeXScale), - _EyeYScale);
 
-				float sinWaveValue = sinCurve(o.uv.x, centerCoord.x, centerCoord.y, (_EyeXScale * 2), _EyeYScale);
-
-				float sinWaveValueNegative = sinCurve(o.uv.x, centerCoord.x, centerCoord.y, (_EyeXScale * 2), - _EyeYScale);
-
-				// iris uvs based on iris thickness
-				float2 irisCoords = float2((((o.uv.x - centerCoord.x) / _EyeIrisSize)/2) + 0.5,(((o.uv.y - centerCoord.y) / _EyeIrisSize)/2) + 0.5);
-
-				fixed4 irisColor = tex2D(_IrisTex, irisCoords);
-				irisColor.a = 1;
-
-				//straight line fix for when yscale is approaching 0
-				if (o.uv.x < (centerCoord.x - (_EyeXScale/2) - (_EyeLidThickness/2))) {
-					return col;
+				if (distance(o.uv, centerCoord) > _DistortRadius) {
+					return fixed4(0, 0, 0, 0);
 				}
 
-				if (o.uv.x > (centerCoord.x + (_EyeXScale / 2) + (_EyeLidThickness / 2))) {
-					return col;
-				}
+				fixed alpha = 0;
 
 				// sclera and iris
 				if (o.uv.y > sinWaveValueNegative && o.uv.y < sinWaveValue) {
-					if (distance(o.uv, centerCoord) < _EyeIrisSize) {
-						if (irisCoords.x < 0) return fixed4(1, 0, 0, 1);
-						return irisColor;
+					half2 lookCenter = half2(centerCoord.x + (_LookDirX *_LookMaxRadius), centerCoord.y + (_LookDirY * _LookMaxRadius));
+					if (distance(o.uv, lookCenter) < _EyeIrisSize) {
+						// iris uvs based on iris thickness
+						float2 irisCoords = float2((((o.uv.x - lookCenter.x) / _EyeIrisSize) / 2) + 0.5, (((o.uv.y - lookCenter.y) / _EyeIrisSize) / 2) + 0.5);
+
+						col = col * tex2D(_IrisTex, irisCoords);
 					}
 					else {
-						return scleraColor;
+						// sclera uvs based on sclera lrngth
+						float2 scleraCoords = float2((((o.uv.x - centerCoord.x) / (1.0 / _EyeXScale)) ) + 0.5, (((o.uv.y - centerCoord.y) / (1.0 / _EyeXScale)) ) + 0.5);
+						col = col * tex2D(_ScleraTex, scleraCoords);
 					}
 				}
-				// upper lid
-				if (abs(o.uv.y - sinWaveValue) < _EyeLidThickness && o.uv.y > sinWaveValue) {
-					if (o.uv.y + _EyeLidThickness > sinWaveValueNegative) {
-						col.a = max((abs(o.uv.y - sinWaveValue) / _EyeLidThickness) / _EyeBlendAmount, col.a);
-						col.xyz = eyeLidColor.xyz;
-						invertAlpha = 1;
+				else {
+					// upper lid
+					if (abs(o.uv.y - sinWaveValue) < _EyeLidThickness && o.uv.y > sinWaveValue) {
+						if (o.uv.y + _EyeLidThickness > sinWaveValueNegative) {
+							alpha = max((abs(o.uv.y - sinWaveValue) / _EyeLidThickness), alpha);
+							isBlendPixel = 1;
+						}
+					}
+
+					// lower lid
+					if (abs(o.uv.y - sinWaveValueNegative) < _EyeLidThickness  && o.uv.y < sinWaveValueNegative) {
+						if (o.uv.y - _EyeLidThickness < sinWaveValue) {
+							alpha = max((abs(o.uv.y - sinWaveValueNegative) / _EyeLidThickness), alpha);
+							isBlendPixel = 1;
+						}
 					}
 				}
 
-				// lower lid
-				if (abs(o.uv.y - sinWaveValueNegative) < _EyeLidThickness  && o.uv.y < sinWaveValueNegative) {
-					if (o.uv.y - _EyeLidThickness < sinWaveValue) {
-						col.a = max((abs(o.uv.y - sinWaveValueNegative) / _EyeLidThickness)/ _EyeBlendAmount, col.a);
-						col.xyz = eyeLidColor.xyz;
-						invertAlpha = 1;
-					}
+				// make sure x scale is in bounds of sin function
+				if (isBlendPixel && o.uv.x < (centerCoord.x - ((1.0 / _EyeXScale) / 2)) - (_EyeLidThickness / 1.5)) {
+					isBlendPixel = 0;
 				}
 
-				// make edges less alpha
-				if(invertAlpha) col.a = 1 - col.a;
+				if (isBlendPixel && o.uv.x >(centerCoord.x + ((1.0 / _EyeXScale) / 2)) + (_EyeLidThickness / 1.5)) {
+					isBlendPixel = 0;
+				}
+
+				// make edges of eyelids blend into distortion map
+				if (isBlendPixel  == 1) {
+					float edgeDistanceRight = abs(o.uv.x - ((centerCoord.x - ((1.0 / _EyeXScale) / 2)) - (_EyeLidThickness / 1.5)));
+					float edgeDistanceLeft = abs(o.uv.x - ((centerCoord.x + ((1.0 / _EyeXScale) / 2)) + (_EyeLidThickness / 1.5)));
+					if (edgeDistanceRight < (_EyeLidThickness) ) {
+						alpha = max(alpha, 1 - (edgeDistanceRight / _EyeLidThickness));
+					}
+					if (edgeDistanceLeft < (_EyeLidThickness )) {
+						alpha = max(alpha, 1 -(edgeDistanceLeft / _EyeLidThickness));
+					}
+
+					col = col * lerp(tex2D(_EyeLidTex, o.uv), fixed4(1, 1, 1, 1), (alpha));
+				}
+
+				//distortion effect blending
+				if (distance(o.uv, centerCoord) > (_DistortRadius - _DistortBlendRadius)) {
+					alpha = (distance(o.uv, centerCoord) - (_DistortRadius - _DistortBlendRadius)) / _DistortBlendRadius;
+					col = lerp(col, fixed4(col.x, col.y, col.z, 0), alpha);
+				}
+
+				col.a = col.a - _Fade;
 
 				return col;
 			}
