@@ -9,6 +9,7 @@
 		_EyeLidThickness("Eye Lid Thickness", Range(0, 0.5)) = 0.01
 		_ScleraTex("Sclera Texture", 2D) = "white" {}
 		_IrisTex("Iris Texture", 2D) = "black" {}
+		_IrisColor("Color OF Iris", Color) = (1,1,1,1)
 		_EyeIrisSize("Size of Iris", Range(0, 0.5)) = 0.01
 		_BumpAmt("Normal Distortion Scalar", range(0,128)) = 10
 		_BumpMap("Normalmap", 2D) = "bump" {}
@@ -54,18 +55,18 @@
 			uniform float _EyeIrisSize;
 			uniform float _EyeXScale;
 			uniform float _EyeYScale;
-			uniform float _EyeBlendAmount;
 			uniform float _DistortRadius;
 			uniform float _DistortBlendRadius;
 			uniform float _Fade;
 			uniform float _LookDirX;
 			uniform float _LookDirY;
 			uniform float _LookMaxRadius;
-			float _BumpAmt;
-			float4 _BumpMap_ST;
-			sampler2D _GrabTexture;
-			float4 _GrabTexture_TexelSize;
-			sampler2D _BumpMap;
+			uniform fixed4 _IrisColor;
+			uniform float _BumpAmt;
+			uniform float4 _BumpMap_ST;
+			uniform sampler2D _GrabTexture;
+			uniform float4 _GrabTexture_TexelSize;
+			uniform sampler2D _BumpMap;
 
 			// sin curve function
 			float sinCurve(float value, float xOffset, float yOffset, float xScale, float yScale)
@@ -134,7 +135,7 @@
 						// iris uvs based on iris thickness
 						float2 irisCoords = float2((((o.uv.x - lookCenter.x) / _EyeIrisSize) / 2) + 0.5, (((o.uv.y - lookCenter.y) / _EyeIrisSize) / 2) + 0.5);
 
-						col = col * tex2D(_IrisTex, irisCoords);
+						col = col * (tex2D(_IrisTex, irisCoords) *_IrisColor);
 					}
 					else {
 						// sclera uvs based on sclera lrngth
@@ -183,7 +184,7 @@
 					col = col * lerp(tex2D(_EyeLidTex, o.uv), fixed4(1, 1, 1, 1), (alpha));
 				}
 
-				//distortion effect blending
+				//distortion effect blending with pure transparency
 				if (distance(o.uv, centerCoord) > (_DistortRadius - _DistortBlendRadius)) {
 					alpha = (distance(o.uv, centerCoord) - (_DistortRadius - _DistortBlendRadius)) / _DistortBlendRadius;
 					col = lerp(col, fixed4(col.x, col.y, col.z, 0), alpha);

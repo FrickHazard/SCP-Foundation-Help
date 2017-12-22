@@ -1,7 +1,4 @@
 sceneSetups:
-- path: Assets/Engine.unity
-  isLoaded: 1
-  isActive: 0
-- path: Assets/BlinkTest.unity
+- path: Assets/scp099.unity
   isLoaded: 1
   isActive: 1

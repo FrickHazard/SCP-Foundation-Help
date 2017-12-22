@@ -5,15 +5,24 @@ using UnityEngine;
 public class SCP099Eye : MonoBehaviour {
 
     // average blink time is about 1/3 of a second
-    public float TotalTime = 0.333f;
+    public float TotalBlinkTime = 0.333f;
 
-    // what sin y scale is considered to be fully opened
+    public float TotalSpawnDieTime = 2f;
+
+    // what sin Y scale value is considered to be fully opened
     public float MaxEyeOpenScale = 0.211f;
 
     private bool isBlinking = false;
 
+    private bool spawning = false;
+
+    private bool dying = false;
+
     // counter for this blinks time
     private float currentBlinkTimeCounter;
+
+    // counter for spawning effect of eye
+    private float spawnDyingTimeCounter;
 
     private Material material;
 
@@ -23,11 +32,39 @@ public class SCP099Eye : MonoBehaviour {
 
     void Update()
     {
-        if (isBlinking == true && currentBlinkTimeCounter != TotalTime)
+        if (isBlinking == true && currentBlinkTimeCounter != TotalBlinkTime)
         {
             currentBlinkTimeCounter += Time.deltaTime;
-            if (currentBlinkTimeCounter > TotalTime) currentBlinkTimeCounter = TotalTime;
+            if (currentBlinkTimeCounter > TotalBlinkTime)
+            {
+                currentBlinkTimeCounter = 0;
+                isBlinking = false;
+            }
             SetEyeClosedPercent(GetBlinkAnimationPercentage());
+        }
+        // fade effect if spawning or dying
+        if (spawning || dying)
+        {
+            spawnDyingTimeCounter += Time.deltaTime;
+            if (spawnDyingTimeCounter > TotalSpawnDieTime)
+            {
+                // if dying animation is finished disable object
+                if (dying)
+                {
+                    gameObject.SetActive(false);
+                }
+                spawnDyingTimeCounter = 0;
+                spawning = false;
+                dying = false;
+            }
+            if (spawning)
+            {
+                SetFade(1 - (spawnDyingTimeCounter / TotalSpawnDieTime));
+            }
+            else
+            {
+                SetFade(spawnDyingTimeCounter / TotalSpawnDieTime);
+            }
         }
     }
 
@@ -56,7 +93,7 @@ public class SCP099Eye : MonoBehaviour {
 
     private float GetBlinkAnimationPercentage()
     {
-        float percentThroughtBlink = (currentBlinkTimeCounter / TotalTime);
+        float percentThroughtBlink = (currentBlinkTimeCounter / TotalBlinkTime);
         // opening eyelid again, since 0.5 is half way mark
         if (percentThroughtBlink > 0.5)
         {
@@ -83,5 +120,24 @@ public class SCP099Eye : MonoBehaviour {
         percent = Mathf.Clamp(percent, 0, 1.0f);
         // scale percent, make max eye amount respected 
         material.SetFloat("_EyeYScale", (percent * MaxEyeOpenScale));
+    }
+
+    public void Spawn(Vector3 position, Vector3 normal, Vector3 up)
+    {
+        transform.position = position;
+        transform.LookAt(position + normal, up);
+        spawning = true;
+        dying = false;
+        SetFade(1f);
+        spawnDyingTimeCounter = 0f;
+        gameObject.SetActive(true);
+    }
+
+    public void Kill()
+    {
+        spawning = false;
+        dying = true;
+        spawnDyingTimeCounter = 0f;
+
     }
 }
