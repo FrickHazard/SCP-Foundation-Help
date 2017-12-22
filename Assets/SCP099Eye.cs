@@ -51,6 +51,7 @@ public class SCP099Eye : MonoBehaviour {
                 // if dying animation is finished disable object
                 if (dying)
                 {
+                    transform.parent = null;
                     gameObject.SetActive(false);
                 }
                 spawnDyingTimeCounter = 0;
@@ -66,6 +67,28 @@ public class SCP099Eye : MonoBehaviour {
                 SetFade(spawnDyingTimeCounter / TotalSpawnDieTime);
             }
         }
+    }
+
+    public void Spawn(RaycastHit rayHit, float scale)
+    {
+        transform.position = rayHit.point;
+        transform.LookAt(rayHit.point + rayHit.normal, Vector3.up);
+        transform.localScale = new Vector3(scale, scale, 1);
+        transform.parent = rayHit.transform;
+        spawning = true;
+        dying = false;
+        SetFade(1f);
+        spawnDyingTimeCounter = 0f;
+        SetIrisColor(Random.ColorHSV(0.2f, 0.8f, 0.5f, 0.8f, 0.1f, 0.8f));
+        gameObject.SetActive(true);
+    }
+
+    public void Kill()
+    {
+        spawning = false;
+        dying = true;
+        spawnDyingTimeCounter = 0f;
+
     }
 
     public void StartBlinkCycle(float minSeconds, float maxSeconds)
@@ -103,12 +126,6 @@ public class SCP099Eye : MonoBehaviour {
         return 1 - percentThroughtBlink * 2;
     }
 
-    public void SetFade(float fade)
-    {
-        fade = Mathf.Clamp(fade, 0, 1.0f);
-        material.SetFloat("_Fade", fade);
-    }
-
     public void SetEyeCenter(Vector3 center)
     {
         material.SetFloat("_LookDirX", center.x);
@@ -122,22 +139,14 @@ public class SCP099Eye : MonoBehaviour {
         material.SetFloat("_EyeYScale", (percent * MaxEyeOpenScale));
     }
 
-    public void Spawn(Vector3 position, Vector3 normal, Vector3 up)
+    private void SetFade(float fade)
     {
-        transform.position = position;
-        transform.LookAt(position + normal, up);
-        spawning = true;
-        dying = false;
-        SetFade(1f);
-        spawnDyingTimeCounter = 0f;
-        gameObject.SetActive(true);
+        fade = Mathf.Clamp(fade, 0, 1.0f);
+        material.SetFloat("_Fade", fade);
     }
 
-    public void Kill()
+    private void SetIrisColor(Color color)
     {
-        spawning = false;
-        dying = true;
-        spawnDyingTimeCounter = 0f;
-
+        material.SetColor("_IrisColor", color);
     }
 }
