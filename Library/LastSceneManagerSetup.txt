@@ -1,4 +1,4 @@
 sceneSetups:
-- path: Assets/scp099.unity
+- path: Assets/Scenes/scp099.unity
   isLoaded: 1
   isActive: 1
