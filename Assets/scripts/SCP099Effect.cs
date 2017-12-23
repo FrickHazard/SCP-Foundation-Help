@@ -1,10 +1,12 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
 public class SCP099Effect : MonoBehaviour
 {
+    public DecalProject proj;
 
     public SCP099Eye EyePrefab;
 
@@ -43,6 +45,9 @@ public class SCP099Effect : MonoBehaviour
     private List<SCP099Eye> eyes = new List<SCP099Eye>();
     private int eyeIndex = 0;
     private bool inAnamolyOccurrence = false;
+    public Mesh m_CubeMesh;
+    private Dictionary<Camera, CommandBuffer> m_Cameras = new Dictionary<Camera, CommandBuffer>();
+    public Material eyeMaterial;
 
     void Start()
     {
@@ -60,11 +65,13 @@ public class SCP099Effect : MonoBehaviour
             Debug.Log("SCP 099 Has Effected Player.");
             StartCoroutine(AnamolyOccurrenceCoroutine());
         }
+        Debug.Log("SCP099 Anamoly Level has Increased to " + AnamolyLevel + ".");
     }
 
     public void EndAnamolyEffect()
     {
         anamolyLevel = 0;
+        Debug.Log("SCP099 Anamoly Stopped.");
         StopCoroutine("AnamolyOccurrenceCoroutine");
         EndAnamolyOccurrence();
     }
@@ -158,6 +165,65 @@ public class SCP099Effect : MonoBehaviour
                 eye.SetEyeCenter((eye.transform.worldToLocalMatrix * eyeLookDir.normalized).normalized);
             }
         });
+    }
+
+    void OnDisable()
+    {
+        foreach (var cam in m_Cameras)
+        {
+            if (cam.Key)
+            {
+                cam.Key.RemoveCommandBuffer(CameraEvent.BeforeLighting, cam.Value);
+            }
+        }
+    }
+
+    private void OnPreCull()
+    {
+        var act = gameObject.activeInHierarchy && enabled;
+        if (!act)
+        {
+            OnDisable();
+            return;
+        }
+
+        var cam = Camera.current;
+        if (!cam)
+            return;
+
+        CommandBuffer buf = null;
+        if (m_Cameras.ContainsKey(cam))
+        {
+            buf = m_Cameras[cam];
+            buf.Clear();
+        }
+        else
+        {
+            buf = new CommandBuffer();
+            buf.name = "SCP099 Eye Command Buffer";
+            m_Cameras[cam] = buf;
+
+            // set this command buffer to be executed just before deferred lighting pass
+            // in the camera
+            cam.AddCommandBuffer(CameraEvent.BeforeLighting, buf);
+        }
+
+        // copy g-buffer normals into a temporary RT
+        var normalsID = Shader.PropertyToID("_WorldNormals");
+        buf.GetTemporaryRT(normalsID, -1, -1);
+        buf.Blit(BuiltinRenderTextureType.GBuffer2, normalsID);
+        // render diffuse+normals decals into two MRTs
+        RenderTargetIdentifier[] mrt = { BuiltinRenderTextureType.GBuffer0, BuiltinRenderTextureType.GBuffer2 };
+        buf.SetRenderTarget(mrt, BuiltinRenderTextureType.CameraTarget);
+        eyes.ForEach(eye =>
+        {
+            if (eye.gameObject.activeSelf)
+            {
+                buf.DrawMesh(m_CubeMesh, eye.transform.localToWorldMatrix, eyeMaterial);
+            }
+        });
+        // release temporary normals RT
+        buf.ReleaseTemporaryRT(normalsID);
     }
 
 }

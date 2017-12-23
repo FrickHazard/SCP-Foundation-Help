@@ -19,7 +19,6 @@ public class SCP099Canvas : MonoBehaviour {
             timeSeenSinceLastAnamolyLevelIncrease += Time.deltaTime;
             if (timeSeenSinceLastAnamolyLevelIncrease > TimeSeenPerAnamolyLevelIncrease)
             {
-                Debug.Log("SCP099 Anamoly Level has Increased");
                 Effect.IncreaseAnamolyLevel();
                 timeSeenSinceLastAnamolyLevelIncrease = 0f;
             }

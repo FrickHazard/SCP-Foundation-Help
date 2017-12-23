@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class SCP099Eye : MonoBehaviour {
 
@@ -73,7 +74,7 @@ public class SCP099Eye : MonoBehaviour {
     {
         transform.position = rayHit.point;
         transform.LookAt(rayHit.point + rayHit.normal, Vector3.up);
-        transform.localScale = new Vector3(scale, scale, 1);
+        transform.localScale = new Vector3(scale, scale, scale);
         transform.parent = rayHit.transform;
         spawning = true;
         dying = false;
@@ -148,5 +149,27 @@ public class SCP099Eye : MonoBehaviour {
     private void SetIrisColor(Color color)
     {
         material.SetColor("_IrisColor", color);
+    }
+
+    private void DrawGizmo(bool selected)
+    {
+        var col = new Color(0.8f, 0.7f, 0.1f, 1.0f);
+        col.a = selected ? 0.3f : 0.1f;
+        Gizmos.color = col;
+        Gizmos.matrix = transform.localToWorldMatrix;
+        Gizmos.DrawCube(Vector3.zero, Vector3.one);
+        col.a = selected ? 0.5f : 0.2f;
+        Gizmos.color = col;
+        Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+    }
+
+    public void OnDrawGizmos()
+    {
+        DrawGizmo(false);
+    }
+
+    public void OnDrawGizmosSelected()
+    {
+        DrawGizmo(true);
     }
 }

@@ -27,6 +27,7 @@
 		Blend SrcAlpha OneMinusSrcAlpha
 		CUll Off
 		ZWrite Off
+		Offset -1, -1
 		ZTest On
 		LOD 200
 
