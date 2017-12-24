@@ -2,9 +2,9 @@
 {
 	Properties
 	{
-		[HideInInspector]_MainTex ("Texture", 2D) = "white" {}
-		_EyeYScale("Default Eye Y scale", Range(0, 0.4)) = 0.1
-		_EyeXScale("Eye X Scale", Range(0, 3.0)) = 0.5
+		[HideInInspector] _MainTex ("Texture", 2D) = "white" {}
+		[HideInInspector] _EyeYScale("Default Eye Y scale", Range(0, 0.4)) = 0.211
+		[HideInInspector] _EyeXScale("Eye X Scale", Range(0, 3.0)) = 1.19
 	    _EyeLidTex("Eye Lid Texture", 2D) = "red" {}
 		_EyeLidThickness("Eye Lid Thickness", Range(0, 0.5)) = 0.01
 		_ScleraTex("Sclera Texture", 2D) = "white" {}
@@ -27,7 +27,6 @@
 		Blend SrcAlpha OneMinusSrcAlpha
 		CUll Off
 		ZWrite Off
-		Offset -1, -1
 		ZTest On
 		LOD 200
 
@@ -38,13 +37,13 @@
 
 		Pass
 		{
+			Fog{ Mode Off }
 			Name "BASE"
 			Tags{ "LightMode" = "Always" }
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
-			// make fog work
-			#pragma multi_compile_fog
+			#pragma exclude_renderers nomrt
 			#include "UnityCG.cginc"
 
 			uniform sampler2D _MainTex;
@@ -68,6 +67,8 @@
 			uniform sampler2D _GrabTexture;
 			uniform float4 _GrabTexture_TexelSize;
 			uniform sampler2D _BumpMap;
+			sampler2D_float _CameraDepthTexture;
+			sampler2D _WorldNormalsForEyes;
 
 			// sin curve function
 			float sinCurve(float value, float xOffset, float yOffset, float xScale, float yScale)
@@ -87,6 +88,11 @@
 				float4 vertex : SV_POSITION;
 				float2 uvbump : TEXCOORD1;
 				float4 uvgrab : TEXCOORD2;
+				float4 screenUV : TEXCOORD3;
+				float3 ray : TEXCOORD4;
+				half3 orientation : TEXCOORD5;
+				half3 orientationX : TEXCOORD6;
+				half3 orientationZ : TEXCOORD7;
 			};
 			
 			output vert (input v)
@@ -96,25 +102,62 @@
 				o.uv = TRANSFORM_TEX(v.uv, _MainTex);
 				o.uvgrab = ComputeGrabScreenPos(o.vertex);
 				o.uvbump = TRANSFORM_TEX(v.uv, _BumpMap);
+				o.screenUV = ComputeScreenPos(o.vertex);
+				o.ray = mul(UNITY_MATRIX_MV, float4(v.vertex.xyz, 1)).xyz * float3(-1, -1, 1);
+				o.orientation = mul((float3x3)unity_ObjectToWorld, float3(0, 1, 0));
+				o.orientationX = mul((float3x3)unity_ObjectToWorld, float3(1, 0, 0));
+				o.orientationZ = mul((float3x3)unity_ObjectToWorld, float3(0, 0, 1));
 				return o;
 			}
+
+			CBUFFER_START(UnityPerCamera2)
+			// float4x4 _CameraToWorld;
+			CBUFFER_END
 			
 			fixed4 frag (output o) : SV_Target
 			{
-				// this block is a normal distort based on grab amount
+				/****               Projection Of Eye On Surface      ****/
+				// fake decal projection
+				// divide by far plane
+				half2 origin = half2(o.uv.xy);
+				o.ray = o.ray * (_ProjectionParams.z / o.ray.z);
+				float2 uv = o.screenUV.xy / o.screenUV.w;
+				// read depth and reconstruct world position
+				float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+				depth = Linear01Depth(depth);
+				//vieport pos
+				float4 vpos = float4(o.ray * depth,1);
+				// world pos
+				float3 wpos = mul(unity_CameraToWorld, vpos).xyz;
+				// local object pos
+				float3 opos = mul(unity_WorldToObject, float4(wpos,1)).xyz;
+
+				// discard parts that arent visible / projected
+				clip(float3(0.5,0.5,0.5) - abs(opos.xyz));
+
+				// multiply the non projection-direction components of vector
+				o.uv = opos.xy + 0.5;
+
+				half3 normal = tex2D(_WorldNormalsForEyes, uv).rgb;
+				fixed3 wnormal = normal.rgb * 2.0 - 1.0;
+				// orientation is Direction of projection, 0.3 is minimum scale / clipping value
+				clip(dot(wnormal, o.orientationZ) - 0.3);
+				half2 dif = (origin - o.uv);
+
+				/****               Normal Distortion    ****/
 				#if UNITY_SINGLE_PASS_STEREO
 				o.uvgrab.xy = TransformStereoScreenSpaceTex(o.uvgrab.xy, o.uvgrab.w);
 				#endif
 				half2 bump = UnpackNormal(tex2D(_BumpMap, o.uvbump)).rg;
-				float2 offset = bump * _BumpAmt * _GrabTexture_TexelSize.xy;
+				float2 offset = (bump * _BumpAmt * _GrabTexture_TexelSize.xy) + (dif * _GrabTexture_TexelSize.xy);
 				#ifdef UNITY_Z_0_FAR_FROM_CLIPSPACE 
 				o.uvgrab.xy = offset * UNITY_Z_0_FAR_FROM_CLIPSPACE(o.uvgrab.z) + o.uvgrab.xy;
 				#else
 				o.uvgrab.xy = offset * o.uvgrab.z + o.uvgrab.xy;
 				#endif
-
 				half4 col = tex2Dproj(_GrabTexture, UNITY_PROJ_COORD(o.uvgrab));
 
+				/***********          Drawing of Eye using Sin function         **********/
 				fixed2 centerCoord = fixed2(0.5, 0.5);
 
 				fixed isBlendPixel = 0;
@@ -123,9 +166,7 @@
 
 				float sinWaveValueNegative = sinCurve(o.uv.x, centerCoord.x, centerCoord.y, (_EyeXScale), - _EyeYScale);
 
-				if (distance(o.uv, centerCoord) > _DistortRadius) {
-					return fixed4(0, 0, 0, 0);
-				}
+				clip(_DistortRadius - distance(o.uv, centerCoord));
 
 				fixed alpha = 0;
 

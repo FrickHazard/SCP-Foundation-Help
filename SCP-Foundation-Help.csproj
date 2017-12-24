@@ -90,7 +90,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\DecalProject.cs" />
     <Compile Include="Assets\DeferredDecals\Decal.cs" />
     <Compile Include="Assets\DeferredDecals\DeferredDecalRenderer.cs" />
     <Compile Include="Assets\DeferredDecals\PostEffectsBase.cs" />
@@ -101,7 +100,6 @@
     <Compile Include="Assets\scripts\SCP099Eye.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Assets\DecalProject.shader" />
     <None Include="Assets\DeferredDecals\DecalShaderDiffuseNormals.shader" />
     <None Include="Assets\DeferredDecals\DecalShaderDiffuseOnly.shader" />
     <None Include="Assets\DeferredDecals\DecalShaderNormalsOnly.shader" />

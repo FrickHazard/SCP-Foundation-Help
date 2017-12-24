@@ -6,8 +6,6 @@ using System.Linq;
 
 public class SCP099Effect : MonoBehaviour
 {
-    public DecalProject proj;
-
     public SCP099Eye EyePrefab;
 
     public int MaxAnamolyLevel = 10;
@@ -45,9 +43,8 @@ public class SCP099Effect : MonoBehaviour
     private List<SCP099Eye> eyes = new List<SCP099Eye>();
     private int eyeIndex = 0;
     private bool inAnamolyOccurrence = false;
-    public Mesh m_CubeMesh;
+    private int eyesLeftToSpawn = 0;
     private Dictionary<Camera, CommandBuffer> m_Cameras = new Dictionary<Camera, CommandBuffer>();
-    public Material eyeMaterial;
 
     void Start()
     {
@@ -91,6 +88,7 @@ public class SCP099Effect : MonoBehaviour
     private void StartAnamolyOccurrence()
     {
         inAnamolyOccurrence = true;
+        eyesLeftToSpawn = Mathf.Min(EyesCountModifierPerLevel * AnamolyLevel, MaxEyeCount);
         SpawnEyes();
     }
 
@@ -98,6 +96,7 @@ public class SCP099Effect : MonoBehaviour
     {
         inAnamolyOccurrence = false;
         eyes.ForEach(eye => { eye.Kill(); });
+        eyesLeftToSpawn = 0;
     }
 
     private void SpawnEyes()
@@ -105,27 +104,35 @@ public class SCP099Effect : MonoBehaviour
         int validHitCount = 0;
         const int MAX_RAYCAST_ATTEMPTS = 100;
         const float MAX_RAYCAST_DISTANCE = 100f;
+        Vector3[] hits = new Vector3[eyes.Count];
         RaycastHit hit;
         for (int i = 0; i < MAX_RAYCAST_ATTEMPTS; i++)
         {
-            Vector3 direction = MyCamera.transform.worldToLocalMatrix.MultiplyVector(new Vector3(Random.Range(-1f, 1f),Random.Range(-0.7f, 0.7f),Random.Range(-1f, 1f)));
+            Vector3 direction = MyCamera.transform.worldToLocalMatrix.MultiplyVector(new Vector3(Random.Range(-1f, 1f),Random.Range(-0.7f, 0.7f),Random.Range(-1f, 1f))).normalized;
             if (Physics.Raycast(MyCamera.transform.position, direction, out hit, MAX_RAYCAST_DISTANCE, RayCastMask))
             {
                 // make sure eyes are apart by set amount
-                if(eyes.Any(eye => {
-                    if (eye.gameObject.activeSelf) return false;
-                    else return Vector3.Distance(eye.transform.position, hit.point) < MinEyeDistanceFromEachOther;
+                if(hits.Any(pos => {
+                    return Vector3.Distance(pos, hit.point) < MinEyeDistanceFromEachOther;
                 })) continue;
-                // some decal check here as well
 
+                // make sure angle of impact isnt more than 60(roughly) degrees
+                if (Mathf.Abs(Vector3.Dot(hit.normal, direction)) < 0.333) continue;
 
+                hits[validHitCount] = hit.point;
+                eyesLeftToSpawn--;
                 validHitCount++;
-                SetNextEye(hit);
-                if (validHitCount >= MaxEyeCount) return;
-                if (validHitCount == EyesCountModifierPerLevel * AnamolyLevel) return;
+                SetNextEye(hit.point, Vector3.Lerp(-direction, hit.normal, 0.5f));
+                if (eyesLeftToSpawn == 0) return;
             }
-           
         }
+        if (eyesLeftToSpawn > 0) StartCoroutine(ContinueSpawn());
+    }
+
+    IEnumerator ContinueSpawn()
+    {
+        yield return new WaitForSeconds(1f);
+        SpawnEyes();
     }
 
     private void SetUpObjectPool()
@@ -146,25 +153,13 @@ public class SCP099Effect : MonoBehaviour
         }
     }
 
-    private void SetNextEye(RaycastHit rayHit)
+    private void SetNextEye(Vector3 postion, Vector3 normal)
     {
         float eyeScaleMax = Mathf.Max(EyeScaleMin, EyeScaleMax + (AnamolyLevel * EyeScaleModifierPerLevel) );
-        eyes[eyeIndex].Spawn(rayHit, Random.Range(EyeScaleMin, eyeScaleMax));
+        eyes[eyeIndex].Spawn(postion, normal, Random.Range(EyeScaleMin, eyeScaleMax));
         eyes[eyeIndex].StartBlinkCycle(EyeBlinkTimerMin, EyeBlinkTimerMax);
         eyeIndex++;
         if (eyeIndex == eyes.Count) eyeIndex = 0;
-    }
-
-    void Update()
-    {
-        if (!inAnamolyOccurrence || AnamolyLevel == 0) return;
-        eyes.ForEach(eye => {
-            if (eye.gameObject.activeSelf)
-            {
-                Vector3 eyeLookDir = Vector3.ProjectOnPlane(MyCamera.transform.position, eye.transform.forward) - eye.transform.position;
-                eye.SetEyeCenter((eye.transform.worldToLocalMatrix * eyeLookDir.normalized).normalized);
-            }
-        });
     }
 
     void OnDisable()
@@ -188,7 +183,7 @@ public class SCP099Effect : MonoBehaviour
         }
 
         var cam = Camera.current;
-        if (!cam)
+        if (!inAnamolyOccurrence || !cam)
             return;
 
         CommandBuffer buf = null;
@@ -208,21 +203,21 @@ public class SCP099Effect : MonoBehaviour
             cam.AddCommandBuffer(CameraEvent.BeforeLighting, buf);
         }
 
-        // copy g-buffer normals into a temporary RT
-        var normalsID = Shader.PropertyToID("_WorldNormals");
-        buf.GetTemporaryRT(normalsID, -1, -1);
-        buf.Blit(BuiltinRenderTextureType.GBuffer2, normalsID);
-        // render diffuse+normals decals into two MRTs
-        RenderTargetIdentifier[] mrt = { BuiltinRenderTextureType.GBuffer0, BuiltinRenderTextureType.GBuffer2 };
-        buf.SetRenderTarget(mrt, BuiltinRenderTextureType.CameraTarget);
-        eyes.ForEach(eye =>
-        {
+        eyes.ForEach(eye => {
             if (eye.gameObject.activeSelf)
             {
-                buf.DrawMesh(m_CubeMesh, eye.transform.localToWorldMatrix, eyeMaterial);
+                Vector3 eyeLookPoint = eye.transform.worldToLocalMatrix * (MyCamera.transform.position - eye.transform.position);
+                eye.SetEyeCenter(Vector3.ProjectOnPlane(eyeLookPoint.normalized, Vector3.forward).normalized);
             }
         });
-        // release temporary normals RT
+
+        // copy g-buffer normals into a temporary RT
+        var normalsID = Shader.PropertyToID("_WorldNormalsForEyes");
+        buf.GetTemporaryRT(normalsID, -1, -1);
+        buf.Blit(BuiltinRenderTextureType.GBuffer2, normalsID);
+        // render depth normals decals into two MRTs, for eyes, bascially sets a global shader variable
+        RenderTargetIdentifier[] mrt = { BuiltinRenderTextureType.GBuffer0, BuiltinRenderTextureType.GBuffer2 };
+        buf.SetRenderTarget(mrt, BuiltinRenderTextureType.CameraTarget);
         buf.ReleaseTemporaryRT(normalsID);
     }
 

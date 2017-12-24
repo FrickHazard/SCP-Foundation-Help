@@ -26,9 +26,20 @@ public class SCP099Eye : MonoBehaviour {
     private float spawnDyingTimeCounter;
 
     private Material material;
+    // shader properties, ids are faster than strings
+    private int _Fade = -1;
+    private int _IrisColor = -1;
+    private int _LookDirX = -1;
+    private int _LookDirY = -1;
+    private int _EyeYScale = -1;
 
     void Awake () {
-        material = GetComponent<MeshRenderer>().material;
+       material = GetComponent<MeshRenderer>().material;
+       _Fade = Shader.PropertyToID("_Fade");
+       _IrisColor = Shader.PropertyToID("_IrisColor");
+       _LookDirX = Shader.PropertyToID("_LookDirX");
+       _LookDirY = Shader.PropertyToID("_LookDirY");
+       _EyeYScale = Shader.PropertyToID("_EyeYScale");
     }
 
     void Update()
@@ -65,17 +76,17 @@ public class SCP099Eye : MonoBehaviour {
             }
             else
             {
-                SetFade(spawnDyingTimeCounter / TotalSpawnDieTime);
+                SetFade(spawnDyingTimeCounter / TotalSpawnDissssssssseTime);
             }
         }
     }
 
-    public void Spawn(RaycastHit rayHit, float scale)
+    public void Spawn(Vector3 position, Vector3 normal, float scale, Transform parent = null)
     {
-        transform.position = rayHit.point;
-        transform.LookAt(rayHit.point + rayHit.normal, Vector3.up);
+        transform.position = position + (normal * 0.01f);
+        transform.LookAt(position + normal, Vector3.up);
         transform.localScale = new Vector3(scale, scale, scale);
-        transform.parent = rayHit.transform;
+        transform.parent = parent;
         spawning = true;
         dying = false;
         SetFade(1f);
@@ -129,26 +140,26 @@ public class SCP099Eye : MonoBehaviour {
 
     public void SetEyeCenter(Vector3 center)
     {
-        material.SetFloat("_LookDirX", center.x);
-        material.SetFloat("_LookDirY", center.y);
+        material.SetFloat(_LookDirX, center.x);
+        material.SetFloat(_LookDirY, center.y);
     }
 
     private void SetEyeClosedPercent(float percent)
     {
         percent = Mathf.Clamp(percent, 0, 1.0f);
         // scale percent, make max eye amount respected 
-        material.SetFloat("_EyeYScale", (percent * MaxEyeOpenScale));
+        material.SetFloat(_EyeYScale, (percent * MaxEyeOpenScale));
     }
 
     private void SetFade(float fade)
     {
         fade = Mathf.Clamp(fade, 0, 1.0f);
-        material.SetFloat("_Fade", fade);
+        material.SetFloat(_Fade, fade);
     }
 
     private void SetIrisColor(Color color)
     {
-        material.SetColor("_IrisColor", color);
+        material.SetColor(_IrisColor, color);
     }
 
     private void DrawGizmo(bool selected)
