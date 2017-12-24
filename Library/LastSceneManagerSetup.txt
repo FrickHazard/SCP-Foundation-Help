@@ -1,4 +1,4 @@
 sceneSetups:
-- path: Assets/Horror Hospital Pack/DemoScene.unity
+- path: Assets/DemoScene.unity
   isLoaded: 1
   isActive: 1
